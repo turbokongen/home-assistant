@@ -39,6 +39,7 @@ class ZwaveSwitch(zwave.ZWaveDeviceEntity, SwitchDevice):
         from pydispatch import dispatcher
 
         zwave.ZWaveDeviceEntity.__init__(self, value, DOMAIN)
+
         self._state = value.data
         dispatcher.connect(
             self._value_changed, ZWaveNetwork.SIGNAL_VALUE_CHANGED)
@@ -57,9 +58,7 @@ class ZwaveSwitch(zwave.ZWaveDeviceEntity, SwitchDevice):
     def turn_on(self, **kwargs):
         """Turn the device on."""
         self._value.node.set_switch(self._value.value_id, True)
-        self._state = self._value.data
 
     def turn_off(self, **kwargs):
         """Turn the device off."""
         self._value.node.set_switch(self._value.value_id, False)
-        self._state = self._value.data
