@@ -155,8 +155,10 @@ DISCOVERY_COMPONENTS = [
 
 ATTR_NODE_ID = "node_id"
 ATTR_VALUE_ID = "value_id"
-
+ATTR_NETWORK_READY = "network_ready"
 ATTR_SCENE_ID = "scene_id"
+ATTR_NODE_STATUS = "node_status"
+ATTR_NODE_QUERY_STAGE = "node_query_stage"
 
 NETWORK = None
 
@@ -473,5 +475,35 @@ class ZWaveDeviceEntity:
 
         if location:
             attrs[ATTR_LOCATION] = location
+
+        if self._value.node.is_failed:
+            node_status = "Failed(Dead)"
+        elif self._value.node.is_ready:
+            node_status = "Ready"
+        elif self._value.node.is_locked:
+            node_status = "Locked"
+        elif self._value.node.is_sleeping:
+            node_status = "Sleeping"
+        elif self._value.node.is_awake:
+            node_status = "Awake"
+
+        if node_status:
+            attrs[ATTR_NODE_STATUS] = node_status
+            _LOGGER.debug("node_id=%s node_status=%s",
+                          self._value.node.node_id,
+                          node_status)
+
+        node_query_stage = self._value.node.query_stage
+
+        if node_query_stage:
+            attrs[ATTR_NODE_QUERY_STAGE] = node_query_stage
+            _LOGGER.debug("node_id=%s node_query_stage=%s",
+                          self._value.node.node_id,
+                          node_query_stage)
+
+        if self._value.network.is_ready:
+            attrs[ATTR_NETWORK_READY] = self._value.network.is_ready
+        else:
+            attrs[ATTR_NETWORK_READY] = False
 
         return attrs
