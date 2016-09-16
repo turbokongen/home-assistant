@@ -8,10 +8,10 @@ import logging
 import voluptuous as vol
 import homeassistant.components.nest as nest
 from homeassistant.components.climate import (
-    STATE_AUTO, STATE_COOL, STATE_HEAT, STATE_IDLE, ClimateDevice,
-    PLATFORM_SCHEMA)
+    STATE_COOL, STATE_HEAT, STATE_IDLE, ClimateDevice, PLATFORM_SCHEMA,
+    ATTR_TARGET_TEMP_HIGH, ATTR_TARGET_TEMP_LOW)
 from homeassistant.const import (
-    TEMP_CELSIUS, CONF_SCAN_INTERVAL, ATTR_TEMPERATURE, STATE_ON)
+    TEMP_CELSIUS, CONF_SCAN_INTERVAL, TEMP_FAHRENHEIT)
 from homeassistant.util.temperature import convert as convert_temperature
 
 DEPENDENCIES = ['nest']
@@ -39,7 +39,6 @@ class NestThermostat(ClimateDevice):
         self._unit = temp_unit
         self.structure = structure
         self.device = device
-        self._fan_list = [STATE_ON, STATE_AUTO]
 
     @property
     def name(self):
@@ -57,7 +56,10 @@ class NestThermostat(ClimateDevice):
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return TEMP_CELSIUS
+        if self.device.measurment_scale == 'F':
+            return TEMP_FAHRENHEIT
+        elif self.device.measurement_scale == 'C':
+            return TEMP_CELSIUS
 
     @property
     def device_state_attributes(self):
@@ -83,35 +85,6 @@ class NestThermostat(ClimateDevice):
             return STATE_HEAT
         else:
             return STATE_IDLE
-
-    @property
-    def target_temperature(self):
-        """Return the temperature we try to reach."""
-        if self.device.mode == 'range':
-            low, high = self.target_temperature_low, \
-                        self.target_temperature_high
-            if self.operation == STATE_COOL:
-                temp = high
-            elif self.operation == STATE_HEAT:
-                temp = low
-            else:
-                # If the outside temp is lower than the current temp, consider
-                # the 'low' temp to the target, otherwise use the high temp
-                if (self.device.structure.weather.current.temperature <
-                        self.current_temperature):
-                    temp = low
-                else:
-                    temp = high
-        else:
-            if self.is_away_mode_on:
-                # away_temperature is a low, high tuple. Only one should be set
-                # if not in range mode, the other will be None
-                temp = self.device.away_temperature[0] or \
-                        self.device.away_temperature[1]
-            else:
-                temp = self.device.target
-
-        return temp
 
     @property
     def target_temperature_low(self):
@@ -140,18 +113,16 @@ class NestThermostat(ClimateDevice):
 
     def set_temperature(self, **kwargs):
         """Set new target temperature."""
-        temperature = convert_temperature(kwargs.get(ATTR_TEMPERATURE),
-                                          self._unit, TEMP_CELSIUS)
-        _LOGGER.debug("Nest set_temperature-input-value=%s", temperature)
-        if temperature is None:
-            return
-        if self.device.mode == 'range':
-            if self.target_temperature == self.target_temperature_low:
-                temperature = (temperature, self.target_temperature_high)
-            elif self.target_temperature == self.target_temperature_high:
-                temperature = (self.target_temperature_low, temperature)
-        _LOGGER.debug("Nest set_temperature-output-value=%s", temperature)
-        self.device.target = temperature
+        if kwargs.get(ATTR_TARGET_TEMP_LOW) is not None and \
+           kwargs.get(ATTR_TARGET_TEMP_HIGH) is not None:
+            target_temp_high = convert_temperature(kwargs.get(
+                ATTR_TARGET_TEMP_HIGH), self._unit, TEMP_CELSIUS)
+            target_temp_low = convert_temperature(kwargs.get(
+                ATTR_TARGET_TEMP_LOW), self._unit, TEMP_CELSIUS)
+
+        temp = (target_temp_low, target_temp_high)
+        _LOGGER.debug("Nest set_temperature-output-value=%s", temp)
+        self.device.target = temp
 
     def set_operation_mode(self, operation_mode):
         """Set operation mode."""
@@ -166,18 +137,17 @@ class NestThermostat(ClimateDevice):
         self.structure.away = False
 
     @property
-    def current_fan_mode(self):
+    def is_fan_on(self):
         """Return whether the fan is on."""
-        return STATE_ON if self.device.fan else STATE_AUTO
+        return self.device.fan
 
-    @property
-    def fan_list(self):
-        """List of available fan modes."""
-        return self._fan_list
+    def turn_fan_on(self):
+        """Turn fan on."""
+        self.device.fan = True
 
-    def set_fan_mode(self, fan):
-        """Turn fan on/off."""
-        self.device.fan = fan.lower()
+    def turn_fan_off(self):
+        """Turn fan off."""
+        self.device.fan = False
 
     @property
     def min_temp(self):
