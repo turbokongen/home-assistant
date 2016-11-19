@@ -614,3 +614,109 @@ class ZWaveDeviceEntity:
             attrs[ATTR_LOCATION] = location
 
         return attrs
+
+    def node_to_dict(node):
+        return {
+            'basic': basic_string(node.basic),
+            'capabilities': list(node.capabilities),
+            'command_classes_as_string': list(node.command_classes_as_string),
+            'device_type': node.device_type,
+            'generic': node.generic,
+            'groups': node.groups_to_dict(),
+            'is_awake': node.is_awake,
+            'is_beaming_device': node.is_beaming_device,
+            'is_failed': node.is_failed,
+            'is_frequent_listening_device': node.is_frequent_listening_device,
+            'is_info_received': node.is_info_received,
+            'is_listening_device': node.is_listening_device,
+            'is_locked': node.is_locked,
+            'is_ready': node.is_ready,
+            'is_routing_device': node.is_routing_device,
+            'is_security_device': node.is_security_device,
+            'is_sleeping': node.is_sleeping,
+            'is_zwave_plus': node.is_zwave_plus,
+            'location': node.location,
+            'manufacturer_id': node.manufacturer_id,
+            'manufacturer_name': node.manufacturer_name,
+            'max_baud_rate': node.max_baud_rate,
+            'name': node.name,
+            'neighbors': list(node.neighbors),
+            'node_id': node.node_id,
+            'num_groups': node.num_groups,
+            'product_id': node.product_id,
+            'product_name': node.product_name,
+            'product_type': node.product_type,
+            'query_stage': node.query_stage,
+            'role': node.role,
+            'security': node.security,
+            'specific': node.specific,
+            'type': node.type,
+            'values': values_to_dict(node),
+            'version': node.version,
+        }
+
+    def basic_string(basic):
+        return {
+            1: "Controller",
+            2: "Static Controller",
+            3: "Slave",
+            4: "Routing Slave"
+        }[basic]
+
+    def values_to_dict(node):
+        values = {}
+        for value_id, value in node.values.items():
+            values[value_id] = {
+                'command_class': value.command_class,
+                'data': value.data,
+                'data_as_string': value.data_as_string,
+                'genre': value.genre,
+                'help': value.help,
+                'id_on_network': value.id_on_network,
+                'index': value.index,
+                'instance': value.instance,
+                'is_polled': value.is_polled,
+                'is_read_only': value.is_read_only,
+                'is_set': value.is_set,
+                'is_write_only': value.is_write_only,
+                'label': value.label,
+                'max': value.max,
+                'min': value.min,
+                'parent_id': value.parent_id,
+                'poll_intensity': value.poll_intensity,
+                'precision': value.precision,
+                'type': value.type,
+                'units': value.units,
+                'value_id': value.value_id,
+            }
+            if isinstance(value.data_items, set):
+                values[value_id]['data_items'] = list(value.data_items)
+            else:
+                values[value_id]['data_items'] = [value.data_items]
+        return values
+
+
+class ZWaveNodesConfigView(HomeAssistantView):
+    """View to return the configuration."""
+
+    url = "/api/zwave/nodes"
+    name = "api:zwave:nodes"
+    extra_urls = ['/api/zwave/nodes/<node_id>']
+
+    def get_nodes_list(self):
+        all_nodes = {}
+        for node_id, node in NETWORK.nodes.items():
+            all_nodes[int(node_id)] = node_to_dict(node)
+        return all_nodes
+
+    def get_node(self, node_id):
+        return node_to_dict(NETWORK.nodes[int(node_id)])
+
+    def get(self, request, node_id=None):
+        """Retrieve if API is running."""
+        if node_id is None:
+            resp = self.get_nodes_list()
+        else:
+            resp = self.get_node(node_id)
+        msg = json.dumps(resp, sort_keys=True).encode('UTF-8')
+        return self.Response(msg, mimetype="application/json", status=200)
