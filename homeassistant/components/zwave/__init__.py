@@ -242,6 +242,7 @@ def setup(hass, config):
     Will automatically load components to support devices found on the network.
     """
     # pylint: disable=global-statement, import-error
+    hass.wsgi.register_view(ZWaveNodesConfigView(hass))
     global NETWORK
 
     descriptions = conf_util.load_yaml_config_file(
@@ -709,17 +710,20 @@ class ZWaveNodesConfigView(HomeAssistantView):
     url = "/api/zwave/nodes"
     name = "api:zwave:nodes"
     extra_urls = ['/api/zwave/nodes/<node_id>']
+    from werkzeug.wrappers import Response
 
     def get_nodes_list(self):
         """Get a list of all nodes."""
         all_nodes = {}
-        for node_id, node in NETWORK.nodes.items():
-            all_nodes[int(node_id)] = ZWaveDeviceEntity.node_to_dict(node)
+        for node_id in NETWORK.nodes.items():
+            all_nodes[int(node_id)] = (
+                ZWaveDeviceEntity.node_to_dict(self, node_id))
         return all_nodes
 
     def get_node(self, node_id):
         """Return node information."""
-        return ZWaveDeviceEntity.node_to_dict(NETWORK.nodes[int(node_id)])
+        return ZWaveDeviceEntity.node_to_dict(
+            self, NETWORK.nodes[int(node_id)])
 
     def get(self, request, node_id=None):
         """Retrieve if API is running."""
