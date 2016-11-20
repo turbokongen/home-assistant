@@ -4,6 +4,7 @@ Support for Z-Wave.
 For more details about this component, please refer to the documentation at
 https://home-assistant.io/components/zwave/
 """
+import json
 import logging
 import os.path
 import time
@@ -19,6 +20,7 @@ from homeassistant.helpers.event import track_time_change
 from homeassistant.util import convert, slugify
 import homeassistant.config as conf_util
 import homeassistant.helpers.config_validation as cv
+from homeassistant.components.http import HomeAssistantView
 from . import const
 
 REQUIREMENTS = ['pydispatcher==2.0.5']
@@ -615,9 +617,10 @@ class ZWaveDeviceEntity:
 
         return attrs
 
-    def node_to_dict(node):
+    def node_to_dict(self, node):
+        """Get node information to dict."""
         return {
-            'basic': basic_string(node.basic),
+            'basic': self.basic_string(node.basic),
             'capabilities': list(node.capabilities),
             'command_classes_as_string': list(node.command_classes_as_string),
             'device_type': node.device_type,
@@ -651,11 +654,13 @@ class ZWaveDeviceEntity:
             'security': node.security,
             'specific': node.specific,
             'type': node.type,
-            'values': values_to_dict(node),
+            'values': self.values_to_dict(node),
             'version': node.version,
         }
 
-    def basic_string(basic):
+    @classmethod
+    def basic_string(cls, basic):
+        """Basic string converter."""
         return {
             1: "Controller",
             2: "Static Controller",
@@ -663,7 +668,9 @@ class ZWaveDeviceEntity:
             4: "Routing Slave"
         }[basic]
 
-    def values_to_dict(node):
+    @classmethod
+    def values_to_dict(cls, node):
+        """Get node values to dict."""
         values = {}
         for value_id, value in node.values.items():
             values[value_id] = {
@@ -704,13 +711,15 @@ class ZWaveNodesConfigView(HomeAssistantView):
     extra_urls = ['/api/zwave/nodes/<node_id>']
 
     def get_nodes_list(self):
+        """Get a list of all nodes."""
         all_nodes = {}
         for node_id, node in NETWORK.nodes.items():
-            all_nodes[int(node_id)] = node_to_dict(node)
+            all_nodes[int(node_id)] = ZWaveDeviceEntity.node_to_dict(node)
         return all_nodes
 
     def get_node(self, node_id):
-        return node_to_dict(NETWORK.nodes[int(node_id)])
+        """Return node information."""
+        return ZWaveDeviceEntity.node_to_dict(NETWORK.nodes[int(node_id)])
 
     def get(self, request, node_id=None):
         """Retrieve if API is running."""
