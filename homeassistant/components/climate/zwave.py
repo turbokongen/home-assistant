@@ -11,6 +11,7 @@ from homeassistant.components.climate import DOMAIN
 from homeassistant.components.climate import ClimateDevice
 from homeassistant.components.zwave import ZWaveDeviceEntity
 from homeassistant.components import zwave
+from homeassistant.components.zwave import workaround
 from homeassistant.const import (
     TEMP_CELSIUS, TEMP_FAHRENHEIT, ATTR_TEMPERATURE)
 
@@ -19,17 +20,8 @@ _LOGGER = logging.getLogger(__name__)
 CONF_NAME = 'name'
 DEFAULT_NAME = 'Z-Wave Climate'
 
-REMOTEC = 0x5254
-REMOTEC_ZXT_120 = 0x8377
-REMOTEC_ZXT_120_THERMOSTAT = (REMOTEC, REMOTEC_ZXT_120)
 ATTR_OPERATING_STATE = 'operating_state'
 ATTR_FAN_STATE = 'fan_state'
-
-WORKAROUND_ZXT_120 = 'zxt_120'
-
-DEVICE_MAPPINGS = {
-    REMOTEC_ZXT_120_THERMOSTAT: WORKAROUND_ZXT_120
-}
 
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
@@ -70,15 +62,11 @@ class ZWaveClimate(ZWaveDeviceEntity, ClimateDevice):
         self._zxt_120 = None
         self.update_properties()
         # Make sure that we have values for the key before converting to int
-        if (value.node.manufacturer_id.strip() and
-                value.node.product_id.strip()):
-            specific_sensor_key = (int(value.node.manufacturer_id, 16),
-                                   int(value.node.product_id, 16))
-            if specific_sensor_key in DEVICE_MAPPINGS:
-                if DEVICE_MAPPINGS[specific_sensor_key] == WORKAROUND_ZXT_120:
-                    _LOGGER.debug("Remotec ZXT-120 Zwave Thermostat"
-                                  " workaround")
-                    self._zxt_120 = 1
+        device_mapping = workaround.get_device_mapping(value)
+        if device_mapping == workaround.WORKAROUND_ZXT_120:
+            _LOGGER.debug("Remotec ZXT-120 Zwave Thermostat"
+                          " workaround")
+            self._zxt_120 = 1
 
     def update_properties(self):
         """Callback on data changes for node values."""
